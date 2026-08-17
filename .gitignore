@@ -43,3 +43,13 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+#igonraciones personales
+docs/GUIA.md
+docs/compact-sessions
+docs/decisions
+docs/research
+tools/*
+contexts/*
+.opencode/*
+main.py
