@@ -1,0 +1,15 @@
+name: mentorias_backend
+description: Backend del Sistema de Mentorías - Dart Shelf
+version: 1.0.0
+
+environment:
+  sdk: ^3.11.5
+
+dependencies:
+  shelf: ^1.4.2
+  shelf_router: ^1.1.4
+  shelf_web_socket: ^2.0.0
+  web_socket_channel: ^3.0.0
+  sqlite3: ^2.5.0
+  crypto: ^3.0.6
+  path: ^1.9.0

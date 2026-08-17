@@ -1,0 +1,39 @@
+📂 ESTRUCTURA DEL PROYECTO
+============================================================
+🕐 Generado   : 2026-07-06 10:23:52
+📁 Directorio : D:\Curso de Sistemas\Gestion de Software\Rossmery_Sistema\Sistema_Mentorias\backend
+📐 Profundidad: Sin límite
+🚫 Excluidos  : 23 patrones
+============================================================
+
+backend/
+├──  bin/  (1 archivos)
+│   └──  server.dart  [130 líneas]
+├──  lib/  (4 carpetas)
+│   ├──  db/  (1 archivos)
+│   │   └──  database.dart  [143 líneas]
+│   ├──  middleware/
+│   ├──  models/
+│   └──  routes/  (5 archivos)
+│       ├──  auth_routes.dart  [83 líneas]
+│       ├──  chat_routes.dart  [78 líneas]
+│       ├──  evaluacion_routes.dart  [54 líneas]
+│       ├──  match_routes.dart  [35 líneas]
+│       └──  profile_routes.dart  [56 líneas]
+├──  mentorias.db
+├──  pubspec.lock
+└──  pubspec.yaml  [15 líneas]
+============================================================
+📊 ESTADÍSTICAS DEL PROYECTO
+============================================================
+
+📋 Resumen:
+   📁 Carpetas        : 6
+   📄 Archivos        : 10
+   📏 Líneas totales  : 594
+   📐 Nivel más profundo: 2
+
+
+============================================================
+⏱️  Tiempo de ejecución: 0.02 segundos
+============================================================
