@@ -70,7 +70,9 @@ La sesión vive solo en memoria (`ApiService.usuarioActual`); al recargar la app
 │   ├── main.dart
 │   ├── models/
 │   ├── screens/
-│   └── services/
+│   ├── services/
+│   ├── widgets/
+│   └── temas/
 ├── backend/                 # API Dart + SQLite
 │   ├── bin/server.dart
 │   ├── lib/db/database.dart

@@ -1,5 +1,10 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
+import '../widgets/campo_texto_app.dart';
+import '../widgets/boton_principal.dart';
+import '../widgets/encabezado_auth.dart';
+import '../widgets/mensaje_error.dart';
+import '../widgets/enlace_navegacion.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -9,17 +14,49 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final _formKey = GlobalKey<FormState>();
+  // ─── Controladores ───
+
+  // Controlador del campo de correo electrónico.
   final _correoController = TextEditingController();
+
+  // Controlador del campo de contraseña.
   final _passwordController = TextEditingController();
-  bool _loading = false;
+
+  // Llave del formulario para validación.
+  final _formKey = GlobalKey<FormState>();
+
+  // ─── Estado ───
+
+  // Indica si se está procesando la petición de login.
+  bool _cargando = false;
+
+  /// Mensaje de error a mostrar (null = sin error).
   String? _error;
 
-  Future<void> _login() async {
+  // ════ CICLO DE VIDA ════
+
+  @override
+  void dispose() {
+    _correoController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  // ════ LÓGICA ════
+
+
+  /* Envía las credenciales al backend y procesa la respuesta.
+  Flujo:
+    1. Valida que los campos no estén vacíos.
+    2. Llama a [ApiService.login].
+    3. Si es exitoso, navega al home según el rol del usuario.
+    4. Si falla, muestra el mensaje de error.
+  */
+  Future<void> _iniciarSesion() async {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() {
-      _loading = true;
+      _cargando = true;
       _error = null;
     });
 
@@ -31,6 +68,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (!mounted) return;
 
+      // Navegar según el rol del usuario
       if (usuario.rol == 'estudiante') {
         Navigator.pushReplacementNamed(context, '/home_estudiante');
       } else {
@@ -39,14 +77,19 @@ class _LoginScreenState extends State<LoginScreen> {
     } catch (e) {
       setState(() => _error = e.toString().replaceFirst('Exception: ', ''));
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted) setState(() => _cargando = false);
     }
   }
+
+  // ════ CONSTRUIR UI ════
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      // ─── Barra superior ───
       appBar: AppBar(title: const Text('Iniciar Sesión')),
+
+      // ─── Cuerpo ───
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
@@ -57,51 +100,51 @@ class _LoginScreenState extends State<LoginScreen> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.school, size: 80, color: Colors.deepPurple),
-                  const SizedBox(height: 16),
-                  const Text('Sistema de Mentorías',
-                      style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+                  // ─── Encabezado ─────────────────
+                  const EncabezadoAuth(
+                    icono: Icons.school,
+                    titulo: 'Sistema de Mentorías',
+                  ),
                   const SizedBox(height: 32),
-                  TextFormField(
-                    controller: _correoController,
-                    decoration: const InputDecoration(
-                      labelText: 'Correo electrónico',
-                      prefixIcon: Icon(Icons.email),
-                      border: OutlineInputBorder(),
-                    ),
-                    keyboardType: TextInputType.emailAddress,
-                    validator: (v) => v == null || v.isEmpty ? 'Ingrese su correo' : null,
+
+                  // ─── Campo: Correo ──────────────
+                  CampoTextoApp(
+                    controlador: _correoController,
+                    etiqueta: 'Correo electrónico',
+                    icono: Icons.email,
+                    tipoTeclado: TextInputType.emailAddress,
+                    validador: (v) =>
+                        v == null || v.isEmpty ? 'Ingrese su correo' : null,
                   ),
                   const SizedBox(height: 16),
-                  TextFormField(
-                    controller: _passwordController,
-                    decoration: const InputDecoration(
-                      labelText: 'Contraseña',
-                      prefixIcon: Icon(Icons.lock),
-                      border: OutlineInputBorder(),
-                    ),
-                    obscureText: true,
-                    validator: (v) => v == null || v.isEmpty ? 'Ingrese su contraseña' : null,
+
+                  // ─── Campo: Contraseña ──────────
+                  CampoTextoApp(
+                    controlador: _passwordController,
+                    etiqueta: 'Contraseña',
+                    icono: Icons.lock,
+                    ocultarTexto: true,
+                    validador: (v) =>
+                        v == null || v.isEmpty ? 'Ingrese su contraseña' : null,
                   ),
-                  if (_error != null) ...[
-                    const SizedBox(height: 12),
-                    Text(_error!, style: const TextStyle(color: Colors.red)),
-                  ],
+
+                  // ─── Mensaje de error ───────────
+                  MensajeError(mensaje: _error),
                   const SizedBox(height: 24),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 48,
-                    child: ElevatedButton(
-                      onPressed: _loading ? null : _login,
-                      child: _loading
-                          ? const CircularProgressIndicator()
-                          : const Text('Iniciar Sesión', style: TextStyle(fontSize: 16)),
-                    ),
+
+                  // ─── Botón de login ─────────────
+                  BotonPrincipal(
+                    texto: 'Iniciar Sesión',
+                    cargando: _cargando,
+                    onPressed: _iniciarSesion,
                   ),
                   const SizedBox(height: 12),
-                  TextButton(
-                    onPressed: () => Navigator.pushNamed(context, '/register'),
-                    child: const Text('¿No tienes cuenta? Regístrate aquí'),
+
+                  // ─── Enlace a registro ──────────
+                  EnlaceNavegacion(
+                    texto: '¿No tienes cuenta? Regístrate aquí',
+                    onPressed: () =>
+                        Navigator.pushNamed(context, '/register'),
                   ),
                 ],
               ),
@@ -110,12 +153,5 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
       ),
     );
-  }
-
-  @override
-  void dispose() {
-    _correoController.dispose();
-    _passwordController.dispose();
-    super.dispose();
   }
 }

@@ -1,6 +1,12 @@
+// Pantalla de gestión de horarios del mentor.
+
 import 'package:flutter/material.dart';
 import '../models/horario.dart';
 import '../services/api_service.dart';
+import '../constantes.dart';
+import '../temas/colores_app.dart';
+import '../temas/estilos_texto_app.dart';
+import '../widgets/estado_vacio.dart';
 
 class HorariosScreen extends StatefulWidget {
   const HorariosScreen({super.key});
@@ -10,23 +16,20 @@ class HorariosScreen extends StatefulWidget {
 }
 
 class _HorariosScreenState extends State<HorariosScreen> {
+  // ─── Estado ───
+
+  /// Lista de horarios del mentor actual.
   List<Horario> _horarios = [];
-  bool _loading = true;
+
+  /// Indica si se está cargando la lista por primera vez.
+  bool _cargando = true;
+
+  /// Mensaje de error a mostrar (null = sin error).
   String? _error;
 
-  static const _diasSemana = [
-    'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo',
-  ];
-
-  static const _diasLabels = {
-    'lunes': 'Lunes',
-    'martes': 'Martes',
-    'miercoles': 'Miércoles',
-    'jueves': 'Jueves',
-    'viernes': 'Viernes',
-    'sabado': 'Sábado',
-    'domingo': 'Domingo',
-  };
+  // ══════════════════════════════════════════════════
+  //  CICLO DE VIDA
+  // ══════════════════════════════════════════════════
 
   @override
   void initState() {
@@ -34,64 +37,83 @@ class _HorariosScreenState extends State<HorariosScreen> {
     _cargarHorarios();
   }
 
+  // ══════════════════════════════════════════════════
+  //  LÓGICA
+  // ══════════════════════════════════════════════════
+
+  /// Carga la lista de horarios desde el backend.
   Future<void> _cargarHorarios() async {
     setState(() {
-      _loading = true;
+      _cargando = true;
       _error = null;
     });
+
     try {
       final mentorId = ApiService.usuarioActual!.id;
       final horarios = await ApiService.getHorariosDeMentor(mentorId);
       setState(() {
         _horarios = horarios;
-        _loading = false;
+        _cargando = false;
       });
     } catch (e) {
       setState(() {
         _error = e.toString().replaceFirst('Exception: ', '');
-        _loading = false;
+        _cargando = false;
       });
     }
   }
 
+  /// Abre el diálogo para agregar un nuevo horario.
+  ///
+  /// Si el usuario completa el formulario, crea el horario
+  /// en el backend y recarga la lista.
   Future<void> _agregarHorario() async {
     final resultado = await showDialog<Map<String, String>>(
       context: context,
-      builder: (ctx) => _AgregarHorarioDialog(),
+      builder: (ctx) => const _DialogoAgregarHorario(),
     );
 
-    if (resultado != null) {
-      try {
-        final mentorId = ApiService.usuarioActual!.id;
-        await ApiService.crearHorario(
-          mentorId,
-          resultado['dia']!,
-          resultado['inicio']!,
-          resultado['fin']!,
+    if (resultado == null) return;
+
+    try {
+      final mentorId = ApiService.usuarioActual!.id;
+      await ApiService.crearHorario(
+        mentorId,
+        resultado['dia']!,
+        resultado['inicio']!,
+        resultado['fin']!,
+      );
+
+      _cargarHorarios();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Horario agregado correctamente')),
         );
-        _cargarHorarios();
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Horario agregado correctamente')),
-          );
-        }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error: ${e.toString().replaceFirst('Exception: ', '')}')),
-          );
-        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Error: ${e.toString().replaceFirst('Exception: ', '')}',
+            ),
+          ),
+        );
       }
     }
   }
 
+  /// Muestra un diálogo de confirmación y elimina el horario.
   Future<void> _eliminarHorario(Horario horario) async {
+    final nombreDia = Constantes.nombresDias[horario.diaSemana] ?? horario.diaSemana;
+
     final confirmado = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Eliminar horario'),
         content: Text(
-          '¿Eliminar ${_diasLabels[horario.diaSemana]} de ${horario.horaInicio} a ${horario.horaFin}?',
+          '¿Eliminar $nombreDia de ${horario.horaInicio} a ${horario.horaFin}?',
         ),
         actions: [
           TextButton(
@@ -100,113 +122,56 @@ class _HorariosScreenState extends State<HorariosScreen> {
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Eliminar', style: TextStyle(color: Colors.red)),
+            child: const Text(
+              'Eliminar',
+              style: TextStyle(color: ColoresApp.error),
+            ),
           ),
         ],
       ),
     );
 
-    if (confirmado == true) {
-      try {
-        await ApiService.eliminarHorario(horario.id);
-        _cargarHorarios();
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error: ${e.toString().replaceFirst('Exception: ', '')}')),
-          );
-        }
+    if (confirmado != true) return;
+
+    try {
+      await ApiService.eliminarHorario(horario.id);
+      _cargarHorarios();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Error: ${e.toString().replaceFirst('Exception: ', '')}',
+            ),
+          ),
+        );
       }
     }
   }
 
-  Map<String, List<Horario>> _groupByDay() {
-    final map = <String, List<Horario>>{};
+  /// Agrupa los horarios por día de la semana.
+  Map<String, List<Horario>> _agruparPorDia() {
+    final mapa = <String, List<Horario>>{};
     for (final h in _horarios) {
-      map.putIfAbsent(h.diaSemana, () => []).add(h);
+      mapa.putIfAbsent(h.diaSemana, () => []).add(h);
     }
-    return map;
+    return mapa;
   }
+
+  // ══════════════════════════════════════════════════
+  //  CONSTRUIR UI
+  // ══════════════════════════════════════════════════
 
   @override
   Widget build(BuildContext context) {
-    final grouped = _groupByDay();
-
     return Scaffold(
+      // ─── Barra superior ───────────────────────
       appBar: AppBar(title: const Text('Mi Disponibilidad')),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : _error != null
-              ? Center(child: Text(_error!, style: const TextStyle(color: Colors.red)))
-              : _horarios.isEmpty
-                  ? const Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.schedule, size: 80, color: Colors.grey),
-                          SizedBox(height: 16),
-                          Text(
-                            'No tienes horarios configurados',
-                            style: TextStyle(fontSize: 16, color: Colors.grey),
-                          ),
-                          SizedBox(height: 8),
-                          Text(
-                            'Toca "+" para agregar tu disponibilidad',
-                            style: TextStyle(color: Colors.grey),
-                          ),
-                        ],
-                      ),
-                    )
-                  : ListView(
-                      padding: const EdgeInsets.all(16),
-                      children: [
-                        for (final dia in _diasSemana)
-                          if (grouped.containsKey(dia))
-                            Card(
-                              margin: const EdgeInsets.only(bottom: 12),
-                              child: Padding(
-                                padding: const EdgeInsets.all(16),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
-                                      children: [
-                                        const Icon(Icons.calendar_today,
-                                            size: 20, color: Colors.deepPurple),
-                                        const SizedBox(width: 8),
-                                        Text(
-                                          _diasLabels[dia]!,
-                                          style: const TextStyle(
-                                              fontSize: 16, fontWeight: FontWeight.bold),
-                                        ),
-                                      ],
-                                    ),
-                                    const Divider(),
-                                    for (final h in grouped[dia]!)
-                                      Padding(
-                                        padding: const EdgeInsets.symmetric(vertical: 4),
-                                        child: Row(
-                                          children: [
-                                            const Icon(Icons.access_time,
-                                                size: 18, color: Colors.grey),
-                                            const SizedBox(width: 8),
-                                            Text('${h.horaInicio} - ${h.horaFin}',
-                                                style: const TextStyle(fontSize: 15)),
-                                            const Spacer(),
-                                            IconButton(
-                                              icon: const Icon(Icons.delete,
-                                                  color: Colors.red, size: 20),
-                                              onPressed: () => _eliminarHorario(h),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                      ],
-                    ),
+
+      // ─── Cuerpo ───────────────────────────────
+      body: _buildContenido(),
+
+      // ─── Botón flotante ───────────────────────
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _agregarHorario,
         icon: const Icon(Icons.add),
@@ -214,22 +179,143 @@ class _HorariosScreenState extends State<HorariosScreen> {
       ),
     );
   }
+
+  /// Construye el contenido según el estado actual.
+  Widget _buildContenido() {
+    // Estado: cargando
+    if (_cargando) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    // Estado: error
+    if (_error != null) {
+      return Center(
+        child: Text(_error!, style: EstilosTextoApp.textoError),
+      );
+    }
+
+    // Estado: sin horarios
+    if (_horarios.isEmpty) {
+      return const EstadoVacio(
+        icono: Icons.schedule,
+        mensaje: 'No tienes horarios configurados\n'
+            'Toca "+" para agregar tu disponibilidad',
+      );
+    }
+
+    // Estado: lista de horarios agrupados por día
+    return _buildListaHorarios();
+  }
+
+  /// Lista de horarios agrupados por día de la semana.
+  Widget _buildListaHorarios() {
+    final agrupados = _agruparPorDia();
+
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        for (final dia in Constantes.diasSemana)
+          if (agrupados.containsKey(dia))
+            _buildTarjetaDia(dia, agrupados[dia]!),
+      ],
+    );
+  }
+
+  /// Tarjeta con los horarios de un día específico.
+  Widget _buildTarjetaDia(String dia, List<Horario> horarios) {
+    final nombreDia = Constantes.nombresDias[dia] ?? dia;
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Encabezado del día
+            Row(
+              children: [
+                const Icon(
+                  Icons.calendar_today,
+                  size: 20,
+                  color: ColoresApp.primario,
+                ),
+                const SizedBox(width: 8),
+                Text(nombreDia, style: EstilosTextoApp.subtitulo),
+              ],
+            ),
+            const Divider(),
+
+            // Lista de horarios de ese día
+            for (final h in horarios) _buildFilaHorario(h),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Fila individual con un rango de horario y botón de eliminar.
+  Widget _buildFilaHorario(Horario horario) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.access_time,
+            size: 18,
+            color: ColoresApp.textoSecundario,
+          ),
+          const SizedBox(width: 8),
+          Text(
+            '${horario.horaInicio} - ${horario.horaFin}',
+            style: EstilosTextoApp.cuerpo,
+          ),
+          const Spacer(),
+          IconButton(
+            icon: const Icon(Icons.delete, color: ColoresApp.error, size: 20),
+            onPressed: () => _eliminarHorario(horario),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
-// --- Diálogo para agregar horario ---
+// ══════════════════════════════════════════════════
+//  DIÁLOGO PARA AGREGAR HORARIO
+// ══════════════════════════════════════════════════
 
-class _AgregarHorarioDialog extends StatefulWidget {
+/// Diálogo para agregar un nuevo horario de disponibilidad.
+///
+/// Permite seleccionar el día de la semana, hora de inicio
+/// y hora de fin. Retorna un [Map] con las claves:
+/// `'dia'`, `'inicio'`, `'fin'`.
+class _DialogoAgregarHorario extends StatefulWidget {
+  const _DialogoAgregarHorario();
+
   @override
-  State<_AgregarHorarioDialog> createState() => _AgregarHorarioDialogState();
+  State<_DialogoAgregarHorario> createState() =>
+      _DialogoAgregarHorarioState();
 }
 
-class _AgregarHorarioDialogState extends State<_AgregarHorarioDialog> {
+class _DialogoAgregarHorarioState extends State<_DialogoAgregarHorario> {
+  // ─── Estado del formulario ─────────────────────
+
+  /// Día de la semana seleccionado.
   String _dia = 'lunes';
+
+  /// Hora de inicio seleccionada.
   TimeOfDay _horaInicio = const TimeOfDay(hour: 8, minute: 0);
+
+  /// Hora de fin seleccionada.
   TimeOfDay _horaFin = const TimeOfDay(hour: 12, minute: 0);
 
-  String _fmt(TimeOfDay t) =>
-      '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+  /// Formatea un [TimeOfDay] como string "HH:mm".
+  String _formatearHora(TimeOfDay hora) {
+    final hh = hora.hour.toString().padLeft(2, '0');
+    final mm = hora.minute.toString().padLeft(2, '0');
+    return '$hh:$mm';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -238,56 +324,12 @@ class _AgregarHorarioDialogState extends State<_AgregarHorarioDialog> {
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          DropdownButtonFormField<String>(
-            value: _dia,
-            decoration: const InputDecoration(
-              labelText: 'Día de la semana',
-              border: OutlineInputBorder(),
-            ),
-            items: const [
-              DropdownMenuItem(value: 'lunes', child: Text('Lunes')),
-              DropdownMenuItem(value: 'martes', child: Text('Martes')),
-              DropdownMenuItem(value: 'miercoles', child: Text('Miércoles')),
-              DropdownMenuItem(value: 'jueves', child: Text('Jueves')),
-              DropdownMenuItem(value: 'viernes', child: Text('Viernes')),
-              DropdownMenuItem(value: 'sabado', child: Text('Sábado')),
-              DropdownMenuItem(value: 'domingo', child: Text('Domingo')),
-            ],
-            onChanged: (v) => setState(() => _dia = v!),
-          ),
+          // Selector de día
+          _buildSelectorDia(),
           const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('Inicio', style: TextStyle(fontSize: 13)),
-                  subtitle: Text(_fmt(_horaInicio),
-                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                  leading: const Icon(Icons.access_time, color: Colors.deepPurple),
-                  onTap: () async {
-                    final t =
-                        await showTimePicker(context: context, initialTime: _horaInicio);
-                    if (t != null) setState(() => _horaInicio = t);
-                  },
-                ),
-              ),
-              Expanded(
-                child: ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('Fin', style: TextStyle(fontSize: 13)),
-                  subtitle: Text(_fmt(_horaFin),
-                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                  leading: const Icon(Icons.access_time, color: Colors.deepPurple),
-                  onTap: () async {
-                    final t =
-                        await showTimePicker(context: context, initialTime: _horaFin);
-                    if (t != null) setState(() => _horaFin = t);
-                  },
-                ),
-              ),
-            ],
-          ),
+
+          // Selectores de hora
+          _buildSelectoresHora(),
         ],
       ),
       actions: [
@@ -299,13 +341,79 @@ class _AgregarHorarioDialogState extends State<_AgregarHorarioDialog> {
           onPressed: () {
             Navigator.pop(context, {
               'dia': _dia,
-              'inicio': _fmt(_horaInicio),
-              'fin': _fmt(_horaFin),
+              'inicio': _formatearHora(_horaInicio),
+              'fin': _formatearHora(_horaFin),
             });
           },
           child: const Text('Guardar'),
         ),
       ],
+    );
+  }
+
+  /// Dropdown para seleccionar el día de la semana.
+  Widget _buildSelectorDia() {
+    return DropdownButtonFormField<String>(
+      value: _dia,
+      decoration: const InputDecoration(
+        labelText: 'Día de la semana',
+      ),
+      items: Constantes.diasSemana.map((dia) {
+        return DropdownMenuItem(
+          value: dia,
+          child: Text(Constantes.nombresDias[dia] ?? dia),
+        );
+      }).toList(),
+      onChanged: (v) => setState(() => _dia = v!),
+    );
+  }
+
+  /// Selectores de hora de inicio y fin.
+  Widget _buildSelectoresHora() {
+    return Row(
+      children: [
+        // Hora de inicio
+        Expanded(
+          child: _buildSelectorHora(
+            etiqueta: 'Inicio',
+            hora: _horaInicio,
+            onSeleccionar: (t) => setState(() => _horaInicio = t),
+          ),
+        ),
+
+        // Hora de fin
+        Expanded(
+          child: _buildSelectorHora(
+            etiqueta: 'Fin',
+            hora: _horaFin,
+            onSeleccionar: (t) => setState(() => _horaFin = t),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Selector individual de hora con [TimePicker].
+  Widget _buildSelectorHora({
+    required String etiqueta,
+    required TimeOfDay hora,
+    required ValueChanged<TimeOfDay> onSeleccionar,
+  }) {
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      title: Text(etiqueta, style: EstilosTextoApp.caption),
+      subtitle: Text(
+        _formatearHora(hora),
+        style: EstilosTextoApp.titulo,
+      ),
+      leading: const Icon(Icons.access_time, color: ColoresApp.primario),
+      onTap: () async {
+        final seleccion = await showTimePicker(
+          context: context,
+          initialTime: hora,
+        );
+        if (seleccion != null) onSeleccionar(seleccion);
+      },
     );
   }
 }

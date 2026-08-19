@@ -1,9 +1,16 @@
+// Pantalla principal del estudiante.
+
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import '../main.dart';
+import '../temas/estilos_texto_app.dart';
+import '../widgets/tarjeta_bienvenida.dart';
+import '../widgets/tarjeta_menu.dart';
 
 class HomeEstudiante extends StatelessWidget {
   const HomeEstudiante({super.key});
+
+  // ════ CONSTRUIR UI ════ 
 
   @override
   Widget build(BuildContext context) {
@@ -11,111 +18,80 @@ class HomeEstudiante extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Panel Estudiante'),
-        actions: [
-          IconButton(
-            icon: Icon(isDark ? Icons.light_mode : Icons.dark_mode),
-            tooltip: isDark ? 'Modo claro' : 'Modo oscuro',
-            onPressed: () {
-              MyApp.appKey.currentState?.toggleTheme();
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: () {
-              ApiService.usuarioActual = null;
-              Navigator.pushReplacementNamed(context, '/login');
-            },
-          ),
-        ],
-      ),
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          final isMobile = constraints.maxWidth < 600;
-          final padding = isMobile ? 16.0 : 24.0;
+      // ─── Barra superior ───────────────────────
+      appBar: _buildAppBar(context, isDark),
 
-          return SingleChildScrollView(
-            padding: EdgeInsets.all(padding),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Card(
-                  child: Padding(
-                    padding: EdgeInsets.all(isMobile ? 16 : 20),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Bienvenido, ${usuario.nombre}',
-                            style: TextStyle(
-                                fontSize: isMobile ? 18 : 22,
-                                fontWeight: FontWeight.bold)),
-                        const SizedBox(height: 8),
-                        Text('Nivel actual: ${usuario.nivel}',
-                            style: TextStyle(
-                                fontSize: isMobile ? 16 : 18,
-                                color: Colors.deepPurple)),
-                        const SizedBox(height: 4),
-                        Text('Rol: ${usuario.rol}'),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 24),
-                const Text('Acciones:',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 12),
-                _MenuCard(
-                  icon: Icons.person,
-                  title: 'Mi Perfil',
-                  subtitle: 'Editar habilidades y objetivos',
-                  onTap: () => Navigator.pushNamed(context, '/perfil'),
-                ),
-                _MenuCard(
-                  icon: Icons.search,
-                  title: 'Buscar Mentores',
-                  subtitle: 'Encuentra mentores según tu nivel y habilidades',
-                  onTap: () => Navigator.pushNamed(context, '/buscar_mentores'),
-                ),
-                _MenuCard(
-                  icon: Icons.chat,
-                  title: 'Buscar Contactos',
-                  subtitle: 'Buscar y conversar con mentores',
-                  onTap: () => Navigator.pushNamed(context, '/chats'),
-                ),
-              ],
+      // ─── Cuerpo ───────────────────────────────
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // ─── Tarjeta de bienvenida ───────────
+            TarjetaBienvenida(
+              nombre: usuario.nombre,
+              detalleSuperior: 'Nivel actual: ${usuario.nivel}',
+              detalleInferior: 'Rol: ${usuario.rol}',
             ),
-          );
-        },
+            const SizedBox(height: 24),
+
+            // ─── Título de menú ──────────────────
+            const Text('Acciones:', style: EstilosTextoApp.titulo),
+            const SizedBox(height: 12),
+
+            // ─── Opciones de menú ────────────────
+            TarjetaMenu(
+              icono: Icons.person,
+              titulo: 'Mi Perfil',
+              subtitulo: 'Editar habilidades y objetivos',
+              onPressed: () => Navigator.pushNamed(context, '/perfil'),
+            ),
+            TarjetaMenu(
+              icono: Icons.search,
+              titulo: 'Buscar Mentores',
+              subtitulo:
+                  'Encuentra mentores según tu nivel y habilidades',
+              onPressed: () =>
+                  Navigator.pushNamed(context, '/buscar_mentores'),
+            ),
+            TarjetaMenu(
+              icono: Icons.chat,
+              titulo: 'Buscar Contactos',
+              subtitulo: 'Buscar y conversar con mentores',
+              onPressed: () => Navigator.pushNamed(context, '/chats'),
+            ),
+          ],
+        ),
       ),
     );
   }
-}
 
-class _MenuCard extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final VoidCallback onTap;
+  // ════ WIDGETS AUXILIARES ════
 
-  const _MenuCard({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.onTap,
-  });
+  // Barra superior con título, botón de tema y cerrar sesión.
+  PreferredSizeWidget _buildAppBar(BuildContext context, bool isDark) {
+    return AppBar(
+      title: const Text('Panel Estudiante'),
+      actions: [
+        // Botón para alternar tema claro/oscuro
+        IconButton(
+          icon: Icon(isDark ? Icons.light_mode : Icons.dark_mode),
+          tooltip: isDark ? 'Modo claro' : 'Modo oscuro',
+          onPressed: () {
+            MyApp.appKey.currentState?.toggleTheme();
+          },
+        ),
 
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: ListTile(
-        leading: Icon(icon, size: 40, color: Colors.deepPurple),
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
-        subtitle: Text(subtitle),
-        trailing: const Icon(Icons.arrow_forward_ios),
-        onTap: onTap,
-      ),
+        // Botón para cerrar sesión
+        IconButton(
+          icon: const Icon(Icons.logout),
+          tooltip: 'Cerrar sesión',
+          onPressed: () {
+            ApiService.usuarioActual = null;
+            Navigator.pushReplacementNamed(context, '/login');
+          },
+        ),
+      ],
     );
   }
 }

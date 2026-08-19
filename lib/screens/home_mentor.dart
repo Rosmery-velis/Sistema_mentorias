@@ -1,10 +1,17 @@
+// Pantalla principal del mentor.
+
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import '../main.dart';
-// No necesita import nuevo, solo agregar el _MenuCard
+import '../temas/colores_app.dart';
+import '../temas/estilos_texto_app.dart';
+import '../widgets/tarjeta_bienvenida.dart';
+import '../widgets/tarjeta_menu.dart';
 
 class HomeMentor extends StatelessWidget {
   const HomeMentor({super.key});
+
+  // ════ CONSTRUIR UI ════
 
   @override
   Widget build(BuildContext context) {
@@ -12,123 +19,94 @@ class HomeMentor extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Panel Mentor'),
-        actions: [
-          IconButton(
-            icon: Icon(isDark ? Icons.light_mode : Icons.dark_mode),
-            tooltip: isDark ? 'Modo claro' : 'Modo oscuro',
-            onPressed: () {
-              MyApp.appKey.currentState?.toggleTheme();
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: () {
-              ApiService.usuarioActual = null;
-              Navigator.pushReplacementNamed(context, '/login');
-            },
-          ),
-        ],
-      ),
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          final isMobile = constraints.maxWidth < 600;
-          final padding = isMobile ? 16.0 : 24.0;
+      // ─── Barra superior ───────────────────────
+      appBar: _buildAppBar(context, isDark),
 
-          return SingleChildScrollView(
-            padding: EdgeInsets.all(padding),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Card(
-                  child: Padding(
-                    padding: EdgeInsets.all(isMobile ? 16 : 20),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Bienvenido, ${usuario.nombre}',
-                            style: TextStyle(
-                                fontSize: isMobile ? 18 : 22,
-                                fontWeight: FontWeight.bold)),
-                        const SizedBox(height: 8),
-                        Text('Enseñas hasta nivel: ${usuario.nivelEnsenar}',
-                            style: TextStyle(
-                                fontSize: isMobile ? 16 : 18,
-                                color: Colors.deepPurple)),
-                        const SizedBox(height: 4),
-                        Text('Habilidades: ${usuario.habilidadesEnsenar.isEmpty ? "No definidas" : usuario.habilidadesEnsenar}'),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 24),
-                const Text('Acciones:',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 12),
-                _MenuCard(
-                  icon: Icons.person,
-                  title: 'Mi Perfil',
-                  subtitle: 'Editar habilidades y nivel que enseñas',
-                  onTap: () => Navigator.pushNamed(context, '/perfil'),
-                ),
-                _MenuCard(
-                  icon: Icons.schedule,
-                  title: 'Mis Horarios',
-                  subtitle: 'Configura tu disponibilidad para estudiantes',
-                  onTap: () => Navigator.pushNamed(context, '/horarios'),
-                ),
-                _MenuCard(
-                  icon: Icons.people,
-                  title: 'Mis Estudiantes',
-                  subtitle: 'Ver estudiantes que has evaluado',
-                  onTap: () => Navigator.pushNamed(context, '/estudiantes'),
-                ),
-                _MenuCard(
-                  icon: Icons.rate_review,
-                  title: 'Evaluar Estudiantes',
-                  subtitle: 'Aprueba o reprueba a tus estudiantes',
-                  onTap: () => Navigator.pushNamed(context, '/evaluar'),
-                ),
-                _MenuCard(
-                  icon: Icons.chat,
-                  title: 'Buscar Contactos',
-                  subtitle: 'Buscar y conversar con estudiantes',
-                  onTap: () => Navigator.pushNamed(context, '/chats'),
-                ),
-              ],
+      // ─── Cuerpo ───────────────────────────────
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // ─── Tarjeta de bienvenida ───────────
+            TarjetaBienvenida(
+              nombre: usuario.nombre,
+              detalleSuperior: 'Enseñas hasta nivel: ${usuario.nivelEnsenar}',
+              detalleInferior:
+                  'Habilidades: ${usuario.habilidadesEnsenar.isEmpty
+                      ? "No definidas"
+                      : usuario.habilidadesEnsenar}',
             ),
-          );
-        },
+            const SizedBox(height: 24),
+
+            // ─── Título de menú ──────────────────
+            const Text('Acciones:', style: EstilosTextoApp.titulo),
+            const SizedBox(height: 12),
+
+            // ─── Opciones de menú ────────────────
+            TarjetaMenu(
+              icono: Icons.person,
+              titulo: 'Mi Perfil',
+              subtitulo: 'Editar habilidades y nivel que enseñas',
+              onPressed: () => Navigator.pushNamed(context, '/perfil'),
+            ),
+            TarjetaMenu(
+              icono: Icons.schedule,
+              titulo: 'Mis Horarios',
+              subtitulo: 'Configura tu disponibilidad para estudiantes',
+              onPressed: () => Navigator.pushNamed(context, '/horarios'),
+            ),
+            TarjetaMenu(
+              icono: Icons.people,
+              titulo: 'Mis Estudiantes',
+              subtitulo: 'Ver estudiantes que has evaluado',
+              onPressed: () =>
+                  Navigator.pushNamed(context, '/estudiantes'),
+            ),
+            TarjetaMenu(
+              icono: Icons.rate_review,
+              titulo: 'Evaluar Estudiantes',
+              subtitulo: 'Aprueba o reprueba a tus estudiantes',
+              onPressed: () => Navigator.pushNamed(context, '/evaluar'),
+            ),
+            TarjetaMenu(
+              icono: Icons.chat,
+              titulo: 'Buscar Contactos',
+              subtitulo: 'Buscar y conversar con estudiantes',
+              onPressed: () => Navigator.pushNamed(context, '/chats'),
+            ),
+          ],
+        ),
       ),
     );
   }
-}
 
-class _MenuCard extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final VoidCallback onTap;
+  // ════ WIDGETS AUXILIARES ════
 
-  const _MenuCard({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.onTap,
-  });
+  /// Barra superior con título, botón de tema y cerrar sesión.
+  PreferredSizeWidget _buildAppBar(BuildContext context, bool isDark) {
+    return AppBar(
+      title: const Text('Panel Mentor'),
+      actions: [
+        // Botón para alternar tema claro/oscuro
+        IconButton(
+          icon: Icon(isDark ? Icons.light_mode : Icons.dark_mode),
+          tooltip: isDark ? 'Modo claro' : 'Modo oscuro',
+          onPressed: () {
+            MyApp.appKey.currentState?.toggleTheme();
+          },
+        ),
 
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: ListTile(
-        leading: Icon(icon, size: 40, color: Colors.deepPurple),
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
-        subtitle: Text(subtitle),
-        trailing: const Icon(Icons.arrow_forward_ios),
-        onTap: onTap,
-      ),
+        // Botón para cerrar sesión
+        IconButton(
+          icon: const Icon(Icons.logout),
+          tooltip: 'Cerrar sesión',
+          onPressed: () {
+            ApiService.usuarioActual = null;
+            Navigator.pushReplacementNamed(context, '/login');
+          },
+        ),
+      ],
     );
   }
 }
