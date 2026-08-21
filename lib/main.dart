@@ -12,21 +12,15 @@ import 'screens/chats_list_screen.dart';
 import 'screens/estudiantes_list_screen.dart';
 import 'models/usuario.dart';
 import 'screens/horarios_screen.dart';
+import 'widgets/cosmos_background.dart';
 
 void main() {
   runApp(MyApp(key: MyApp.appKey));
 }
 
-/* Widget raíz de la aplicación.
-
-Mantiene el estado del tema (claro/oscuro) y expone [appKey] para que otras pantallas puedan alternar el tema mediante
-[MyApp.appKey.currentState?.toggleTheme()].
-*/
 class MyApp extends StatefulWidget {
   const MyApp({super.key});
 
-  // Llave global para acceder al estado del tema desde cualquier pantalla.
-  // ignore: library_private_types_in_public_api
   static final GlobalKey<_MyAppState> appKey = GlobalKey<_MyAppState>();
 
   @override
@@ -34,53 +28,33 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> {
-  // ─── Estado ────────────────────────────────────
-
-  // Modo de tema actual (claro u oscuro).
-  ThemeMode _modoTema = ThemeMode.light;
-
-  // ══════════════════════════════════════════════════
-  //  MÉTODOS PÚBLICOS
-  // ══════════════════════════════════════════════════
-
-  // Alterna entre tema claro y oscuro.
-  void toggleTheme() {
-    setState(() {
-      _modoTema = _modoTema == ThemeMode.light
-          ? ThemeMode.dark
-          : ThemeMode.light;
-    });
-  }
-
-  // ══════════════════════════════════════════════════
-  //  CONSTRUIR UI
-  // ══════════════════════════════════════════════════
-
   @override
   Widget build(BuildContext context) {
+    // ─── App principal ───
     return MaterialApp(
       title: 'Sistema de Mentorías',
       debugShowCheckedModeBanner: false,
+      theme: TemaApp.cosmos,
 
-      // ─── Temas ────────────────────────────────
-      themeMode: _modoTema,
-      theme: TemaApp.claro,
-      darkTheme: TemaApp.oscuro,
+      // ─── Fondo animado detrás de todas las pantallas ───
+      builder: (context, child) {
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            const CosmosBackground(),
+            child!,
+          ],
+        );
+      },
 
-      // ─── Rutas ────────────────────────────────
       initialRoute: '/login',
       routes: _buildRutas(),
       onGenerateRoute: _buildRutaDinamica,
     );
   }
 
-  // ══════════════════════════════════════════════════
-  //  RUTAS
-  // ══════════════════════════════════════════════════
+  // ════ RUTAS ════
 
-  // Define las rutas estáticas de la aplicación.
-
-  // Cada ruta corresponde a una pantalla principal.
   Map<String, WidgetBuilder> _buildRutas() {
     return {
       '/login': (context) => const LoginScreen(),
@@ -96,9 +70,6 @@ class _MyAppState extends State<MyApp> {
     };
   }
 
-  // Genera rutas dinámicas que requieren argumentos.
-
-  // Actualmente solo se usa para `/chat`, que recibe un [Usuario] como argumento (el contacto con el que se va a chatear).
   Route<dynamic>? _buildRutaDinamica(RouteSettings settings) {
     if (settings.name == '/chat') {
       final contacto = settings.arguments as Usuario;

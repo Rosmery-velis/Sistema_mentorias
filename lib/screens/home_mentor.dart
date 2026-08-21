@@ -2,7 +2,6 @@
 
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
-import '../main.dart';
 import '../temas/colores_app.dart';
 import '../temas/estilos_texto_app.dart';
 import '../widgets/tarjeta_bienvenida.dart';
@@ -16,11 +15,10 @@ class HomeMentor extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final usuario = ApiService.usuarioActual!;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
       // ─── Barra superior ───────────────────────
-      appBar: _buildAppBar(context, isDark),
+      appBar: _buildAppBar(context),
 
       // ─── Cuerpo ───────────────────────────────
       body: SingleChildScrollView(
@@ -84,19 +82,10 @@ class HomeMentor extends StatelessWidget {
   // ════ WIDGETS AUXILIARES ════
 
   /// Barra superior con título, botón de tema y cerrar sesión.
-  PreferredSizeWidget _buildAppBar(BuildContext context, bool isDark) {
+  PreferredSizeWidget _buildAppBar(BuildContext context) {
     return AppBar(
       title: const Text('Panel Mentor'),
       actions: [
-        // Botón para alternar tema claro/oscuro
-        IconButton(
-          icon: Icon(isDark ? Icons.light_mode : Icons.dark_mode),
-          tooltip: isDark ? 'Modo claro' : 'Modo oscuro',
-          onPressed: () {
-            MyApp.appKey.currentState?.toggleTheme();
-          },
-        ),
-
         // Botón para cerrar sesión
         IconButton(
           icon: const Icon(Icons.logout),

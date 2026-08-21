@@ -49,7 +49,15 @@ docs/GUIA.md
 docs/compact-sessions
 docs/decisions
 docs/research
-tools/*
+tools_go/*
 contexts/*
 .opencode/*
-main.py
+tool_main.go
+go.mod
+go.sum
+index_fondo.html
+
+pathches/*
+cambios_git.py
+
+.gitignore

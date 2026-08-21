@@ -18,11 +18,6 @@ class BurbujaChat extends StatelessWidget {
     required this.esMio,
   });
 
-  // Color de fondo según si el mensaje es propio o del contacto.
-  Color get _colorFondo {
-    return esMio ? ColoresApp.primarioClaro : ColoresApp.divisor;
-  }
-
   @override
   Widget build(BuildContext context) {
     return Align(
@@ -34,7 +29,7 @@ class BurbujaChat extends StatelessWidget {
           maxWidth: MediaQuery.of(context).size.width * 0.75,
         ),
         decoration: BoxDecoration(
-          color: _colorFondo,
+          color: esMio ? ColoresApp.primario : ColoresApp.superficieElevada,
           borderRadius: BorderRadius.only(
             topLeft: const Radius.circular(16),
             topRight: const Radius.circular(16),
@@ -44,7 +39,11 @@ class BurbujaChat extends StatelessWidget {
         ),
         child: Text(
           contenido,
-          style: EstilosTextoApp.cuerpo,
+          style: EstilosTextoApp.cuerpo.copyWith(
+            color: esMio
+                ? ColoresApp.textoSobrePrimario
+                : ColoresApp.textoPrincipal,
+          ),
         ),
       ),
     );

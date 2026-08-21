@@ -44,9 +44,7 @@ class _ChatScreenState extends State<ChatScreen> {
   // Suscripción al stream de mensajes del WebSocket.
   StreamSubscription? _suscripcionMensajes;
 
-  // ══════════════════════════════════════════════════
-  //  CICLO DE VIDA
-  // ══════════════════════════════════════════════════
+  // ════ CICLO DE VIDA ════
 
   @override
   void initState() {
@@ -58,15 +56,12 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void dispose() {
     _suscripcionMensajes?.cancel();
-    _chatService.dispose();
     _mensajeController.dispose();
     _scrollController.dispose();
     super.dispose();
   }
 
-  // ══════════════════════════════════════════════════
-  //  LÓGICA
-  // ══════════════════════════════════════════════════
+  // ════ LÓGICA ════
 
   // Carga el historial de mensajes desde el backend.
 
@@ -85,8 +80,6 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
-  // Conecta al WebSocket y escucha mensajes entrantes.
-
   // Solo procesa mensajes que involucren al contacto actual (como emisor o receptor).
   void _conectarWebSocket() {
     final miId = ApiService.usuarioActual!.id;
@@ -96,26 +89,56 @@ class _ChatScreenState extends State<ChatScreen> {
       final involucraContacto = mensaje.emisorId == widget.contacto.id ||
           mensaje.receptorId == widget.contacto.id;
 
-      if (involucraContacto) {
-        setState(() => _mensajes.add(mensaje));
-        _desplazarAlFinal();
+      if (!involucraContacto) return;
+
+      // ── Es eco de nuestro propio mensaje ──
+      // Ya lo mostramos por optimistic update, solo actualizar su ID
+      if (mensaje.emisorId == miId) {
+        final index = _mensajes.indexWhere((m) =>
+            m.id == null &&
+            m.emisorId == mensaje.emisorId &&
+            m.receptorId == mensaje.receptorId &&
+            m.contenido == mensaje.contenido);
+
+        if (index != -1) {
+          setState(() => _mensajes[index] = mensaje);
+        }
+        return;
       }
+
+      // ── Mensaje del otro usuario ──
+      setState(() => _mensajes.add(mensaje));
+      _desplazarAlFinal();
     });
   }
 
-  /// Envía un mensaje al contacto actual.
-  ///
-  /// Valida que el texto no esté vacío antes de enviar.
-  /// Limpia el campo de texto después del envío.
+  // Envía un mensaje al contacto actual.
+  //
+  // Valida que el texto no esté vacío antes de enviar.
+  // Limpia el campo de texto después del envío.
   void _enviarMensaje() {
     final texto = _mensajeController.text.trim();
     if (texto.isEmpty) return;
 
+    final miId = ApiService.usuarioActual!.id;
+
+    // Optimistic update: mostrar al instante en la UI
+    setState(() {
+      _mensajes.add(Mensaje(
+        emisorId: miId,
+        receptorId: widget.contacto.id,
+        contenido: texto,
+        fecha: DateTime.now().toIso8601String(),
+      ));
+    });
+    _desplazarAlFinal();
+
+    // Enviar al servidor (el eco traerá el ID real)
     _chatService.enviarMensaje(widget.contacto.id, texto);
     _mensajeController.clear();
   }
 
-  /// Desplaza la lista de mensajes al final (último mensaje).
+  // Desplaza la lista de mensajes al final (último mensaje).
   void _desplazarAlFinal() {
     Future.delayed(const Duration(milliseconds: 100), () {
       if (_scrollController.hasClients) {
@@ -128,25 +151,23 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
-  // ══════════════════════════════════════════════════
-  //  CONSTRUIR UI
-  // ══════════════════════════════════════════════════
+  // ════ CONSTRUIR UI ════
 
   @override
   Widget build(BuildContext context) {
     final miId = ApiService.usuarioActual!.id;
 
     return Scaffold(
-      // ─── Barra superior ───────────────────────
+      // ─── Barra superior ───
       appBar: _buildAppBar(),
 
-      // ─── Cuerpo ───────────────────────────────
+      // ─── Cuerpo ───
       body: Column(
         children: [
-          // ─── Lista de mensajes ─────────────────
+          // ─── Lista de mensajes ───
           Expanded(child: _buildListaMensajes(miId)),
 
-          // ─── Barra de envío ────────────────────
+          // ─── Barra de envío ───
           BarraMensajeChat(
             controlador: _mensajeController,
             onEnviar: _enviarMensaje,

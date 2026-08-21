@@ -1,12 +1,12 @@
 class Mensaje {
-  final int id;
+  final int? id;
   final int emisorId;
   final int receptorId;
   final String contenido;
   final String fecha;
 
   Mensaje({
-    required this.id,
+    this.id,            // ← opcional
     required this.emisorId,
     required this.receptorId,
     required this.contenido,

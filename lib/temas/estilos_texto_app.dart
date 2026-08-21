@@ -1,13 +1,6 @@
 // Estilos de texto centralizados de la aplicación.
-
 // Define los estilos tipográficos reutilizables en toda la app.
 // Se usan junto con [ColoresApp] para mantener consistencia visual.
-
-/// Uso:
-/// ```dart
-/// Text('Hola', style: EstilosTextoApp.tituloGrande)
-/// ```
-library;
 
 import 'package:flutter/material.dart';
 import 'colores_app.dart';
@@ -67,6 +60,7 @@ class EstilosTextoApp {
     fontSize: 16,
     fontWeight: FontWeight.w600,
     letterSpacing: 0.5,
+    color: ColoresApp.textoSobrePrimario,
   );
 
   /// Mensaje de error (validación, excepciones).
@@ -78,8 +72,15 @@ class EstilosTextoApp {
   /// Texto de enlaces navegables ("¿No tienes cuenta?").
   static const TextStyle textoEnlace = TextStyle(
     fontSize: 14,
-    color: ColoresApp.primario,
+    color: ColoresApp.primarioClaro,
     fontWeight: FontWeight.w500,
+  );
+
+  /// Texto de acento (badges, etiquetas destacadas, elementos dorados).
+  static const TextStyle textoAcento = TextStyle(
+    fontSize: 14,
+    color: ColoresApp.acento,
+    fontWeight: FontWeight.w600,
   );
 
   /// Texto pequeño (fechas, metadatos, pies de tarjeta).

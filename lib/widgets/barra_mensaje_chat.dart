@@ -24,8 +24,8 @@ class BarraMensajeChat extends StatelessWidget {
         color: ColoresApp.superficie,
         boxShadow: [
           BoxShadow(
-            color: ColoresApp.divisor,
-            blurRadius: 4,
+            color: ColoresApp.glow.withValues(alpha: 0.1),
+            blurRadius: 8,
             offset: const Offset(0, -2),
           ),
         ],

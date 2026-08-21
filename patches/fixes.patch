@@ -1,0 +1,99 @@
+# Entregame el codigo arreglado en esas partes que tu sabes en este formato que es algo parecido al git diff, pero supongo que lo entenderas a la primera:
+# Prefijos:
+# ~  contexto (ancla, no se modifica)
+# -  eliminar (se busca y se quita)
+# +  agregar (se inserta en su lugar)
+# *** buscar *** (Separador de bloques de cambio dentro de un archivo/s)
+#Ejemplo del formtato que se debe entregar
+=== tools/buscador_global.py ===
+
+*** buscar ***
+
+~
+-def find_all_matches_in_file(file_path, keywords, context_lines, group_threshold, case_sensitive):
++def find_all_matches_in_file(file_path, keywords, context_lines, group_threshold, case_sensitive, exact_match):
+~    """
+~    Busca TODAS las keywords en un archivo y devuelve bloques agrupados
+~    con etiquetas de qué keywords matchearon cada línea.
+~    """
+~    try:
+-        lines = leer_archivo_con_cache(str(file_path)).splitlines()
+-    except:
++        mtime = os.path.getmtime(str(file_path))
++        lines = leer_archivo_con_cache(str(file_path), version=mtime).splitlines()
++    except Exception:
+~        return [], set()  # ← Retornar set vacío también
+~
+
+*** buscar ***
+
+~
+~    for keyword in keywords:
+~        if keyword.startswith("regex:"):
+~            pat = keyword[6:]  # Quitar "regex:" del inicio
+-        elif EXACT_MATCH:
++        elif exact_match:
+~            pat = r"\b" + re.escape(keyword) + r"\b"
+~        else:
+~            pat = re.escape(keyword)
+
+*** buscar ***
+
+~                 else:
+~                    pattern = re.escape(keyword)
+~
+-                if re.search(pattern, content, flags):
+-                    files.add(file_path)
++                try:
++                    if re.search(pattern, content, flags):
++                        files.add(file_path)
++                except re.error:
++                    print(f"⚠️  Regex inválido: '{keyword}' → patrón '{pattern}'")
++                    continue
+~            except (PermissionError, UnicodeDecodeError):
+~                continue
+
+=== tools/buscador_archivos.py ===
+
+*** buscar ***
+ 
+-def extract_context_blocks(file_path, keyword, context_lines, group_threshold):
++def extract_context_blocks(file_path, keyword, context_lines, group_threshold, exact_match):
+~    """Extrae bloques de contexto agrupando coincidencias cercanas"""
+~    try:
+-        lines = leer_archivo_con_cache(str(file_path)).splitlines()
+-    except:
++        mtime = os.path.getmtime(str(file_path))
++        lines = leer_archivo_con_cache(str(file_path), version=mtime).splitlines()
++    except Exception:
+~        return []
+~     
+~    # Encontrar todas las líneas que matchean
+~    matches = []
+~    flags = 0 if CASE_SENSITIVE else re.IGNORECASE
+~    for i, line in enumerate(lines, 1):
+-        if EXACT_MATCH:
++        if keyword.startswith("regex:"):
++            pat = keyword[6:]
++        elif exact_match:
+~            pat = r"\b" + re.escape(keyword) + r"\b"
+~        else:
+~            pat = re.escape(keyword)
+
+*** buscar ***
+~        return "\n".join(output), files_processed
+~
++    # Pre-computar keywords por archivo (O(n) total)
++    file_keywords_map = {}
++    if keyword == "MÚLTIPLE":
++        for block in results:
++            fpath = block["file"]
++            if fpath not in file_keywords_map:
++                file_keywords_map[fpath] = set()
++            for line in block["lines"]:
++                if line["is_match"] and line.get("keywords"):
++                    file_keywords_map[fpath].update(line["keywords"])
++
+~    current_file = None
+~    
+~    for result in results:

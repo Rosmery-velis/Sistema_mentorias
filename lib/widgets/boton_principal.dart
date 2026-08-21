@@ -1,6 +1,7 @@
 // Botón principal reutilizable con estado de carga.
 
 import 'package:flutter/material.dart';
+import '../temas/colores_app.dart';
 
 class BotonPrincipal extends StatelessWidget {
   /// Texto que se muestra en el botón.
@@ -44,7 +45,7 @@ class BotonPrincipal extends StatelessWidget {
         height: 22,
         child: CircularProgressIndicator(
           strokeWidth: 2.5,
-          color: Colors.white,
+          color: ColoresApp.textoSobrePrimario,
         ),
       );
     }

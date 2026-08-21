@@ -1,0 +1,755 @@
+=== tools_go/buscador_global.go ===
+
+*** buscar ***
+
+~import (
++	"bufio"
++	"errors"
+~	"fmt"
+~	"io/fs"
+~	"os"
+~	"path/filepath"
+~	"regexp"
++	"runtime"
+~	"sort"
+~	"strings"
+~	"sync"
+~	"time"
+~)
+
+*** buscar ***
+
+~}
+~
+-// 🚀 CACHÉ DE ARCHIVOS
+-type cacheEntry struct {
+-	mtime   int64
+-	content string
+-}
+-
+-var fileCache sync.Map
+-
+-func leerArchivoConCache(path string) string {
+-	info, err := os.Stat(path)
+-	if err != nil {
+-		return ""
+-	}
+-	mtime := info.ModTime().Unix()
+-
+-	if v, ok := fileCache.Load(path); ok {
+-		entry := v.(cacheEntry)
+-		if entry.mtime == mtime {
+-			return entry.content
+-		}
+-	}
+-
+-	if DebugGlobal {
+-		fmt.Printf("   🔄 Leyendo desde disco: %s\n", path)
+-	}
+-
+-	bytes, err := os.ReadFile(path)
+-	if err != nil {
+-		return ""
+-	}
+-	content := string(bytes)
+-	fileCache.Store(path, cacheEntry{mtime: mtime, content: content})
+-	return content
+-}
+-
+~// 🔧 FUNCIONES
+~
+~func buildPattern(keyword string, exactMatch, caseSensitive bool) (*regexp.Regexp, error) {
++	if strings.TrimSpace(keyword) == "" {
++		return nil, errors.New("keyword vacía")
++	}
+~	pat := keyword
+~	if strings.HasPrefix(keyword, "regex:") {
+
+*** buscar ***
+
+~type blockTmp struct {
+~	Start      int
+~	End        int
+~	MatchLines map[int][]string
+~}
+~
+-func minInt(a, b int) int {
+-	if a < b {
+-		return a
+-	}
+-	return b
+-}
+-
+-func maxInt(a, b int) int {
+-	if a > b {
+-		return a
+-	}
+-	return b
+-}
+-
+-func findAllMatchesInFile(filePath string, keywords []string, contextLines, groupThreshold int, caseSensitive, exactMatch bool) ([]ResultBlock, map[string]bool) {
+-	content := leerArchivoConCache(filePath)
+-	if content == "" {
+-		return nil, nil
+-	}
+-	lines := strings.Split(strings.TrimRight(content, "\n"), "\n")
+-
+-	lineMatches := make(map[int][]string)
+-	keywordsFound := make(map[string]bool)
+-
+-	for _, kw := range keywords {
+-		compiled, err := buildPattern(kw, exactMatch, caseSensitive)
+-		if err != nil {
+-			continue
+-		}
+-		for i, line := range lines {
+-			if compiled.MatchString(line) {
+-				lineNum := i + 1
+-				lineMatches[lineNum] = append(lineMatches[lineNum], kw)
+-				keywordsFound[kw] = true
+-			}
+-		}
+-	}
+-
+-	if len(lineMatches) == 0 {
+-		return nil, nil
+-	}
+-
+-	sortedLines := make([]int, 0, len(lineMatches))
+-	for k := range lineMatches {
+-		sortedLines = append(sortedLines, k)
+-	}
+-	sort.Ints(sortedLines)
+-
+-	var blocks []blockTmp
+-	first := sortedLines[0]
+-	currentBlock := blockTmp{
+-		Start:      maxInt(0, first-contextLines-1),
+-		End:        minInt(len(lines), first+contextLines),
+-		MatchLines: map[int][]string{first: lineMatches[first]},
+-	}
+-
+-	for _, lineNum := range sortedLines[1:] {
+-		newStart := maxInt(0, lineNum-contextLines-1)
+-		newEnd := minInt(len(lines), lineNum+contextLines)
+-
+-		if newStart <= currentBlock.End+groupThreshold {
+-			currentBlock.Start = minInt(currentBlock.Start, newStart)
+-			currentBlock.End = maxInt(currentBlock.End, newEnd)
+-			currentBlock.MatchLines[lineNum] = lineMatches[lineNum]
+-		} else {
+-			blocks = append(blocks, currentBlock)
+-			currentBlock = blockTmp{
+-				Start:      newStart,
+-				End:        newEnd,
+-				MatchLines: map[int][]string{lineNum: lineMatches[lineNum]},
+-			}
+-		}
+-	}
+-	blocks = append(blocks, currentBlock)
+-
+-	var results []ResultBlock
+-	for i, block := range blocks {
+-		var formattedLines []LineInfo
+-		for j := block.Start; j < block.End; j++ {
+-			lineNum := j + 1
+-			contentLine := lines[j]
+-			if kws, ok := block.MatchLines[lineNum]; ok {
+-				formattedLines = append(formattedLines, LineInfo{
+-					LineNum:  lineNum,
+-					Content:  contentLine,
+-					IsMatch:  true,
+-					Keywords: kws,
+-				})
+-			} else {
+-				formattedLines = append(formattedLines, LineInfo{
+-					LineNum: lineNum,
+-					Content: contentLine,
+-					IsMatch: false,
+-				})
+-			}
+-		}
+-		results = append(results, ResultBlock{
+-			File:    filePath,
+-			Lines:   formattedLines,
+-			HasGap:  i > 0,
+-		})
+-	}
+-
+-	return results, keywordsFound
+-}
+-
+-func extractContextBlocks(filePath, keyword string, contextLines, groupThreshold int, exactMatch, caseSensitive bool) []ResultBlock {
+-	content := leerArchivoConCache(filePath)
+-	if content == "" {
+-		return nil
+-	}
+-	lines := strings.Split(strings.TrimRight(content, "\n"), "\n")
+-
+-	compiled, err := buildPattern(keyword, exactMatch, caseSensitive)
+-	if err != nil {
+-		return nil
+-	}
+-
+-	var matches []int
+-	for i, line := range lines {
+-		if compiled.MatchString(line) {
+-			matches = append(matches, i+1)
+-		}
+-	}
+-
+-	if len(matches) == 0 {
+-		return nil
+-	}
+-
+-	var blocks []blockTmp
+-	first := matches[0]
+-	currentBlock := blockTmp{
+-		Start:      maxInt(0, first-contextLines-1),
+-		End:        minInt(len(lines), first+contextLines),
+-		MatchLines: map[int][]string{first: nil},
+-	}
+-
+-	for _, lineNum := range matches[1:] {
+-		newStart := maxInt(0, lineNum-contextLines-1)
+-		newEnd := minInt(len(lines), lineNum+contextLines)
+-
+-		if newStart <= currentBlock.End+groupThreshold {
+-			currentBlock.Start = minInt(currentBlock.Start, newStart)
+-			currentBlock.End = maxInt(currentBlock.End, newEnd)
+-			currentBlock.MatchLines[lineNum] = nil
+-		} else {
+-			blocks = append(blocks, currentBlock)
+-			currentBlock = blockTmp{
+-				Start:      newStart,
+-				End:        newEnd,
+-				MatchLines: map[int][]string{lineNum: nil},
+-			}
+-		}
+-	}
+-	blocks = append(blocks, currentBlock)
+-
+-	var results []ResultBlock
+-	for i, block := range blocks {
+-		var formattedLines []LineInfo
+-		for j := block.Start; j < block.End; j++ {
+-			lineNum := j + 1
+-			contentLine := lines[j]
+-			_, isMatch := block.MatchLines[lineNum]
+-			formattedLines = append(formattedLines, LineInfo{
+-				LineNum: lineNum,
+-				Content: contentLine,
+-				IsMatch: isMatch,
+-			})
+-		}
+-		results = append(results, ResultBlock{
+-			File:    filePath,
+-			Lines:   formattedLines,
+-			HasGap:  i > 0,
+-		})
+-	}
+-	return results
+-}
+-
+-func findFilesWithPattern(keyword string, exts, excludePatterns []string, searchDir string) []string {
+-	files := make(map[string]bool)
+-	searchPath := filepath.Join(ProjectRoot, searchDir)
+-
+-	if _, err := os.Stat(searchPath); os.IsNotExist(err) {
+-		fmt.Printf("⚠️  Directorio '%s' no existe\n", searchPath)
+-		return nil
+-	}
+-
+-	relSearch, _ := filepath.Rel(ProjectRoot, searchPath)
+-	fmt.Printf("✅ Buscando en: %s\n", relSearch)
+-
+-	compiled, err := buildPattern(keyword, ExactMatchGlobal, CaseSensitiveGlobal)
+-	if err != nil {
+-		return nil
+-	}
+-
+-	filepath.WalkDir(searchPath, func(path string, d fs.DirEntry, err error) error {
+-		if err != nil {
+-			return nil
+-		}
+-		if d.IsDir() {
+-			if ShouldExcludePath(path, excludePatterns) {
+-				return filepath.SkipDir
+-			}
+-			return nil
+-		}
+-
+-		if ShouldExcludePath(path, excludePatterns) {
+-			return nil
+-		}
+-
+-		matchedExt := false
+-		for _, ext := range exts {
+-			if m, _ := filepath.Match(ext, filepath.Base(path)); m {
+-				matchedExt = true
+-				break
+-			}
+-		}
+-		if !matchedExt {
+-			return nil
+-		}
+-
+-		content := leerArchivoConCache(path)
+-		if compiled.MatchString(content) {
+-			files[path] = true
+-		}
+-		return nil
+-	})
+-
+-	fmt.Printf("   📁 Extensiones buscadas: %v\n", exts)
+-	fmt.Printf("   📊 Archivos encontrados: %d\n", len(files))
+-
+-	var result []string
+-	for k := range files {
+-		result = append(result, k)
+-	}
+-	sort.Strings(result)
+-	return result
+-}
++type compiledPattern struct {
++	kw   string
++	re   *regexp.Regexp
++	fast string
++}
++
++func procesarArchivo(path string, cfg BuscadorGlobalConfig, patterns []compiledPattern) ([]ResultBlock, map[string]bool) {
++	f, err := os.Open(path)
++	if err != nil {
++		return nil, nil
++	}
++	defer f.Close()
++
++	keywordsFound := make(map[string]bool)
++	var blocks []ResultBlock
++	var currentBlock *ResultBlock
++	var ctxBefore []LineInfo
++	lastMatchLine := -cfg.ContextLines - cfg.GroupThreshold - cfg.ContextLines - 1
++	postCtxRemaining := 0
++
++	scanner := bufio.NewScanner(f)
++	buf := make([]byte, 0, 64*1024)
++	scanner.Buffer(buf, 1024*1024) // Max 1MB per line
++
++	lineNum := 0
++	for scanner.Scan() {
++		lineNum++
++		line := strings.TrimRight(scanner.Text(), "\r")
++
++		var matchedKws []string
++		lineForCheck := line
++		if !cfg.CaseSensitive {
++			lineForCheck = strings.ToLower(line)
++		}
++
++		for _, p := range patterns {
++			isMatch := false
++			if p.fast != "" {
++				if strings.Contains(lineForCheck, p.fast) {
++					isMatch = p.re.MatchString(line)
++				}
++			} else {
++				isMatch = p.re.MatchString(line)
++			}
++			if isMatch {
++				matchedKws = append(matchedKws, p.kw)
++				keywordsFound[p.kw] = true
++			}
++		}
++
++		li := LineInfo{LineNum: lineNum, Content: line, IsMatch: len(matchedKws) > 0, Keywords: matchedKws}
++
++		if len(matchedKws) > 0 {
++			dist := lineNum - lastMatchLine
++			if currentBlock != nil && dist-2*cfg.ContextLines <= cfg.GroupThreshold {
++				currentBlock.Lines = append(currentBlock.Lines, ctxBefore...)
++				currentBlock.Lines = append(currentBlock.Lines, li)
++				ctxBefore = nil
++			} else {
++				if currentBlock != nil {
++					blocks = append(blocks, *currentBlock)
++				}
++				currentBlock = &ResultBlock{File: path, HasGap: len(blocks) > 0}
++				currentBlock.Lines = append(currentBlock.Lines, ctxBefore...)
++				currentBlock.Lines = append(currentBlock.Lines, li)
++				ctxBefore = nil
++			}
++			lastMatchLine = lineNum
++			postCtxRemaining = cfg.ContextLines
++		} else {
++			if postCtxRemaining > 0 {
++				currentBlock.Lines = append(currentBlock.Lines, li)
++				postCtxRemaining--
++			} else {
++				ctxBefore = append(ctxBefore, li)
++				if len(ctxBefore) > cfg.ContextLines {
++					ctxBefore = ctxBefore[1:]
++				}
++			}
++		}
++	}
++
++	if currentBlock != nil {
++		blocks = append(blocks, *currentBlock)
++	}
++
++	return blocks, keywordsFound
++}
+~
+~func formatOutputGlobal(results []ResultBlock, keyword string, filesProcessed map[string]bool) (string, map[string]bool) {
+
+*** buscar ***
+
+~// RunBuscadorGlobal es el punto de entrada principal
+~func RunBuscadorGlobal() {
+~	loadConfigBG() //  Carga en caliente
+~	startTime := time.Now()
+-	excludePatterns := append(ExcluirCarpetas, ExcluirArchivos...)
++	excludePatterns := make([]string, 0, len(ExcluirCarpetas)+len(ExcluirArchivos))
++	excludePatterns = append(excludePatterns, ExcluirCarpetas...)
++	excludePatterns = append(excludePatterns, ExcluirArchivos...)
++
++	cfg := BuscadorGlobalConfig{
++		Keywords:       KeywordsGlobal,
++		ContextLines:   ContextLinesGlobal,
++		GroupThreshold: GroupThresholdGlobal,
++		SearchDir:      SearchDirGlobal,
++		CaseSensitive:  CaseSensitiveGlobal,
++		ExactMatch:     ExactMatchGlobal,
++		RequiereTodas:  RequiereTodasGlobal,
++		OutputFile:     OutputFileGlobal,
++		FileExtensions: FileExtensionsGlobal,
++		ModoAgrupado:   ModoAgrupadoGlobal,
++		Debug:          DebugGlobal,
++	}
++
++	// Pre-compilar patrones una sola vez
++	var allPatterns []compiledPattern
++	for _, kw := range cfg.Keywords {
++		if strings.TrimSpace(kw) == "" {
++			continue
++		}
++		re, err := buildPattern(kw, cfg.ExactMatch, cfg.CaseSensitive)
++		if err != nil {
++			fmt.Printf("⚠️ Error compilando patrón '%s': %v\n", kw, err)
++			continue
++		}
++		p := compiledPattern{kw: kw, re: re}
++		if strings.HasPrefix(kw, "regex:") {
++			p.fast = ""
++		} else if cfg.CaseSensitive {
++			p.fast = kw
++		} else {
++			p.fast = strings.ToLower(kw)
++		}
++		allPatterns = append(allPatterns, p)
++	}
+~
+-	configExt := FileExtensionsGlobal
+-	configExclude := excludePatterns
+-	configDir := SearchDirGlobal
++	configExt := cfg.FileExtensions
++	configExclude := excludePatterns
++	configDir := cfg.SearchDir
+~
+~	relDir, _ := filepath.Rel(ProjectRoot, filepath.Join(ProjectRoot, configDir))
+~	relDir = filepath.ToSlash(relDir)
+~
+~	header := []string{
+~		"🔍 BÚSQUEDA INTELIGENTE - Archivos agrupados (sin repeticiones)",
+~		strings.Repeat("=", 65),
+~		fmt.Sprintf("🕐 Generado: %s", startTime.Format("2006-01-02 15:04:05")),
+~		fmt.Sprintf("📁 Directorio: %s", relDir),
+-		fmt.Sprintf("🔑 Keywords: %d patrones", len(KeywordsGlobal)),
+-		fmt.Sprintf("📏 Contexto: %d líneas antes/después", ContextLinesGlobal),
++		fmt.Sprintf("🔑 Keywords: %d patrones", len(cfg.Keywords)),
++		fmt.Sprintf("📏 Contexto: %d líneas antes/después", cfg.ContextLines),
+~		fmt.Sprintf("🔀 Modo: %s", func() string {
+-			if ModoAgrupadoGlobal {
++			if cfg.ModoAgrupado {
+~				return "AGRUPADO"
+~			}
+~			return "SEPARADO"
+~		}()),
+~		fmt.Sprintf("🎯 Coincidencia: %s", func() string {
+-			if RequiereTodasGlobal {
++			if cfg.RequiereTodas {
+~				return "TODAS las keywords"
+~			}
+~			return "CUALQUIER keyword"
+~		}()),
+~		"",
+~	}
+~
+~	var allOutput []string
+~	filesProcessed := make(map[string]bool)
+~	totalMatches := 0
+~
+~	fmt.Printf("🔍 Iniciando búsqueda en '%s'...\n", relDir)
+~
+-	if ModoAgrupadoGlobal {
+-		fmt.Println("   📦 Modo agrupado: buscando archivos con coincidencias...")
+-
+-		var allFiles map[string]bool
+-		if RequiereTodasGlobal {
+-			first := true
+-			for _, kw := range KeywordsGlobal {
+-				files := findFilesWithPattern(kw, configExt, configExclude, configDir)
+-				kwMap := make(map[string]bool)
+-				for _, f := range files {
+-					kwMap[f] = true
+-				}
+-
+-				if first {
+-					allFiles = kwMap
+-					first = false
+-				} else {
+-					for k := range allFiles {
+-						if !kwMap[k] {
+-							delete(allFiles, k)
+-						}
+-					}
+-				}
+-			}
+-			if allFiles == nil {
+-				allFiles = make(map[string]bool)
+-			}
+-		} else {
+-			allFiles = make(map[string]bool)
+-			for _, kw := range KeywordsGlobal {
+-				files := findFilesWithPattern(kw, configExt, configExclude, configDir)
+-				for _, f := range files {
+-					allFiles[f] = true
+-				}
+-			}
+-		}
+-
+-		fmt.Printf("   📁 Archivos a procesar: %d\n", len(allFiles))
+-
+-		for filePath := range allFiles {
+-			blocks, _ := findAllMatchesInFile(filePath, KeywordsGlobal, ContextLinesGlobal, GroupThresholdGlobal, CaseSensitiveGlobal, ExactMatchGlobal)
+-			if len(blocks) > 0 {
+-				outputSection, _ := formatOutputGlobal(blocks, "MÚLTIPLE", make(map[string]bool))
+-				allOutput = append(allOutput, outputSection)
+-				filesProcessed[filePath] = true
+-				for _, b := range blocks {
+-					for _, line := range b.Lines {
+-						if line.IsMatch {
+-							totalMatches++
+-						}
+-					}
+-				}
+-			}
+-		}
+-	} else {
+-		fmt.Println("   📋 Modo separado: buscando cada keyword individualmente...")
+-		for _, kw := range KeywordsGlobal {
+-			files := findFilesWithPattern(kw, configExt, configExclude, configDir)
+-			if len(files) == 0 {
+-				outputSection := fmt.Sprintf("🔎 Buscando: '%s'\n%s\n   ⚠️  No se encontraron coincidencias\n\n", kw, strings.Repeat("─", 70))
+-				allOutput = append(allOutput, outputSection)
+-				continue
+-			}
+-
+-			for _, filePath := range files {
+-				blocks := extractContextBlocks(filePath, kw, ContextLinesGlobal, GroupThresholdGlobal, ExactMatchGlobal, CaseSensitiveGlobal)
+-				for _, b := range blocks {
+-					for _, line := range b.Lines {
+-						if line.IsMatch {
+-							totalMatches++
+-						}
+-					}
+-				}
+-				outputSection, _ := formatOutputGlobal(blocks, kw, filesProcessed)
+-				allOutput = append(allOutput, outputSection)
+-			}
+-		}
+-	}
++	// Función interna para procesar una lista de patrones concurrentemente
++	processPatterns := func(patterns []compiledPattern, keywordLabel string) {
++		pathsChan := make(chan string, 100)
++		resultsChan := make(chan struct {
++			blocks []ResultBlock
++			kws    map[string]bool
++			path   string
++		}, 100)
++
++		var wg sync.WaitGroup
++		numWorkers := runtime.NumCPU()
++		for i := 0; i < numWorkers; i++ {
++			wg.Add(1)
++			go func() {
++				defer wg.Done()
++				for path := range pathsChan {
++					blocks, kws := procesarArchivo(path, cfg, patterns)
++					resultsChan <- struct {
++						blocks []ResultBlock
++						kws    map[string]bool
++						path   string
++					}{blocks, kws, path}
++				}
++			}()
++		}
++
++		// Walker Goroutine
++		go func() {
++			searchPath := filepath.Join(ProjectRoot, configDir)
++			if _, err := os.Stat(searchPath); os.IsNotExist(err) {
++				fmt.Printf("⚠️  Directorio '%s' no existe\n", searchPath)
++			} else {
++				filepath.WalkDir(searchPath, func(path string, d fs.DirEntry, err error) error {
++					if err != nil {
++						fmt.Fprintf(os.Stderr, "⚠️ WalkDir error en %s: %v\n", path, err)
++						return nil
++					}
++					if d.IsDir() {
++						if ShouldExcludePath(path, configExclude) {
++							return filepath.SkipDir
++						}
++						return nil
++					}
++					if ShouldExcludePath(path, configExclude) {
++						return nil
++					}
++					matchedExt := false
++					for _, ext := range configExt {
++						if m, _ := filepath.Match(ext, filepath.Base(path)); m {
++							matchedExt = true
++							break
++						}
++					}
++					if matchedExt {
++						pathsChan <- path
++					}
++					return nil
++				})
++			}
++			close(pathsChan)
++		}()
++
++		go func() {
++			wg.Wait()
++			close(resultsChan)
++		}()
++
++		var partialResults []ResultBlock
++		fileKwMap := make(map[string]map[string]bool)
++
++		for res := range resultsChan {
++			if len(res.blocks) > 0 {
++				partialResults = append(partialResults, res.blocks...)
++				if fileKwMap[res.path] == nil {
++					fileKwMap[res.path] = make(map[string]bool)
++				}
++				for k := range res.kws {
++					fileKwMap[res.path][k] = true
++				}
++			}
++		}
++
++		sort.Slice(partialResults, func(i, j int) bool {
++			if partialResults[i].File != partialResults[j].File {
++				return partialResults[i].File < partialResults[j].File
++			}
++			if len(partialResults[i].Lines) == 0 || len(partialResults[j].Lines) == 0 {
++				return false
++			}
++			return partialResults[i].Lines[0].LineNum < partialResults[j].Lines[0].LineNum
++		})
++
++		if cfg.RequiereTodas && keywordLabel == "MÚLTIPLE" {
++			var filtered []ResultBlock
++			for _, res := range partialResults {
++				if len(fileKwMap[res.File]) == len(patterns) {
++					filtered = append(filtered, res)
++				}
++			}
++			partialResults = filtered
++		}
++
++		if len(partialResults) == 0 && keywordLabel != "MÚLTIPLE" {
++			allOutput = append(allOutput, fmt.Sprintf("🔎 Buscando: '%s'\n%s\n   ⚠️  No se encontraron coincidencias\n\n", keywordLabel, strings.Repeat("─", 70)))
++		} else {
++			// Actualizar stats globales
++			localProcessed := make(map[string]bool)
++			outputSection, processed := formatOutputGlobal(partialResults, keywordLabel, localProcessed)
++			allOutput = append(allOutput, outputSection)
++			for f := range processed {
++				filesProcessed[f] = true
++			}
++			for _, b := range partialResults {
++				for _, line := range b.Lines {
++					if line.IsMatch {
++						totalMatches++
++					}
++				}
++			}
++		}
++	}
++
++	if cfg.ModoAgrupado {
++		fmt.Println("   📦 Modo agrupado: buscando archivos con coincidencias...")
++		processPatterns(allPatterns, "MÚLTIPLE")
++	} else {
++		fmt.Println("   📋 Modo separado: buscando cada keyword individualmente...")
++		for _, p := range allPatterns {
++			processPatterns([]compiledPattern{p}, p.kw)
++		}
++	}
+~
+~	endTime := time.Now()
+~	duration := endTime.Sub(startTime).Seconds()
+~
+~	footer := []string{
+~		"",
+~		strings.Repeat("=", 65),
+~		"✅ RESULTADO LIMPIO",
+~		strings.Repeat("=", 65),
+~		"💡 Ventajas:",
+~		"• Cada archivo aparece SOLO UNA VEZ por keyword",
+~		"• Coincidencias cercanas se agrupan automáticamente",
+~		"• Bloques distantes se separan con '...'",
+~		"• Sin ruido visual de rutas repetidas",
+~		"",
+~		"📊 Estadísticas:",
+~		fmt.Sprintf("   • Archivos únicos procesados: %d", len(filesProcessed)),
+~		fmt.Sprintf("   • Bloques de contexto encontrados: %d", totalMatches),
+~		fmt.Sprintf("   • Tiempo de ejecución: %.2f segundos", duration),
+~		"",
+~	}
+~
+~	fullOutput := strings.Join(header, "\n") + strings.Join(allOutput, "\n") + strings.Join(footer, "\n")
+~
+~	outputPath := filepath.Join(ProjectRoot, OutputFileGlobal)
+-	os.MkdirAll(filepath.Dir(outputPath), os.ModePerm)
+-
+-	err := os.WriteFile(outputPath, []byte(fullOutput), 0644)
+-	if err != nil {
+-		fmt.Printf("❌ Error al escribir archivo: %v\n", err)
+-		return
++	if err := os.MkdirAll(filepath.Dir(outputPath), os.ModePerm); err != nil {
++		fmt.Printf("❌ Error al crear directorio de output: %v\n", err)
++		return
++	}
++
++	// Escritura atómica
++	tmpPath := outputPath + ".tmp"
++	if err := os.WriteFile(tmpPath, []byte(fullOutput), 0644); err != nil {
++		fmt.Printf("❌ Error al escribir archivo temporal: %v\n", err)
++		return
++	}
++	if err := os.Rename(tmpPath, outputPath); err != nil {
++		fmt.Printf("❌ Error al renombrar archivo temporal: %v\n", err)
++		return
+~	}
+~
+~	relOutputPath, _ := filepath.Rel(ProjectRoot, outputPath)
+~	fmt.Println("✅ Búsqueda completada!")
+~	fmt.Printf("📄 Resultados guardados en: %s\n", filepath.ToSlash(relOutputPath))
+~	fmt.Printf("📊 %d archivos, %d bloques encontrados\n", len(filesProcessed), totalMatches)
+~	fmt.Printf("⏱️  Tiempo: %.2f segundos\n", duration)
+~}

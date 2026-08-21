@@ -1,0 +1,134 @@
+============================================================
+  REPORTE DE CAMBIOS
+============================================================
+
+Fecha           : 2026-08-20 12:40:04
+Archivo patch   : patches/fixes.patch
+Directorio base : /home/mister-t/Documentos/Repositorios_Git/300 Spartans: THERMOPYLAE
+Modo            : APLICADO
+Total cambios   : 8
+Exitosos        : 7
+Fallidos        : 1
+
+------------------------------------------------------------
+  CAMBIOS EXITOSOS
+------------------------------------------------------------
+
+  Archivo : tools/buscador_global.py
+  Bloque  : 1
+  Línea   : 114
+  Eliminadas (3):
+    - def find_all_matches_in_file(file_path, keywords, context_lines, group_threshold, case_sensitive):
+    -         lines = leer_archivo_con_cache(str(file_path)).splitlines()
+    -     except:
+  Agregadas (4):
+    + def find_all_matches_in_file(file_path, keywords, context_lines, group_threshold, case_sensitive, exact_match):
+    +         mtime = os.path.getmtime(str(file_path))
+    +         lines = leer_archivo_con_cache(str(file_path), version=mtime).splitlines()
+    +     except Exception:
+
+  Archivo : tools/buscador_global.py
+  Bloque  : 2
+  Línea   : 132
+  Eliminadas (1):
+    -         elif EXACT_MATCH:
+  Agregadas (1):
+    +         elif exact_match:
+
+  Archivo : tools/buscador_global.py
+  Bloque  : 3
+  Línea   : 254
+  Eliminadas (2):
+    -                 if re.search(pattern, content, flags):
+    -                     files.add(file_path)
+  Agregadas (6):
+    +                 try:
+    +                     if re.search(pattern, content, flags):
+    +                         files.add(file_path)
+    +                 except re.error:
+    +                     print(f"⚠️  Regex inválido: '{keyword}' → patrón '{pattern}'")
+    +                     continue
+
+  Archivo : tools/buscador_global.py
+  Bloque  : 4
+  Línea   : 271
+  Eliminadas (4):
+    - def extract_context_blocks(file_path, keyword, context_lines, group_threshold):
+    -         lines = leer_archivo_con_cache(str(file_path)).splitlines()
+    -     except:
+    -         if EXACT_MATCH:
+  Agregadas (7):
+    + def extract_context_blocks(file_path, keyword, context_lines, group_threshold, exact_match):
+    +         mtime = os.path.getmtime(str(file_path))
+    +         lines = leer_archivo_con_cache(str(file_path), version=mtime).splitlines()
+    +     except Exception:
+    +         if keyword.startswith("regex:"):
+    +             pat = keyword[6:]
+    +         elif exact_match:
+
+  Archivo : tools/buscador_global.py
+  Bloque  : 5
+  Línea   : 359
+  Agregadas (11):
+    +     # Pre-computar keywords por archivo (O(n) total)
+    +     file_keywords_map = {}
+    +     if keyword == "MÚLTIPLE":
+    +         for block in results:
+    +             fpath = block["file"]
+    +             if fpath not in file_keywords_map:
+    +                 file_keywords_map[fpath] = set()
+    +             for line in block["lines"]:
+    +                 if line["is_match"] and line.get("keywords"):
+    +                     file_keywords_map[fpath].update(line["keywords"])
+    + 
+
+  Archivo : tools/buscador_global.py
+  Bloque  : 6
+  Línea   : 381
+  Eliminadas (8):
+    -                 # Recopilar TODAS las keywords encontradas en ESTE archivo
+    -                 file_keywords = set()
+    -                 for block in results:
+    -                     if block["file"] == result["file"]:
+    -                         for line in block["lines"]:
+    -                             if line["is_match"] and line.get("keywords"):
+    -                                 file_keywords.update(line["keywords"])
+    -                 
+  Agregadas (2):
+    +                 file_keywords = file_keywords_map.get(result["file"], set())
+    +                
+
+  Archivo : tools/buscador_global.py
+  Bloque  : 7
+  Línea   : 476
+  Eliminadas (1):
+    -                 CASE_SENSITIVE
+  Agregadas (2):
+    +                 CASE_SENSITIVE,
+    +                 EXACT_MATCH
+
+------------------------------------------------------------
+  ERRORES
+------------------------------------------------------------
+
+  Archivo : tools/buscador_global.py
+  Bloque  : 8
+  Error   : Contexto no encontrado
+  Patrón buscado:
+    │                 
+    │             for file_path in files:
+    │                 blocks = extract_context_blocks(
+    │                     file_path, keyword,
+    │                     CONTEXT_LINES,
+    │                     GROUP_THRESHOLD
+    │                 )
+    │                 if blocks:
+    │                     total_matches += len(blocks)
+    │                 
+    │                 output_section, files_processed = format_output(
+    │                     blocks, keyword, files_processed
+
+============================================================
+  RESULTADO: DETENIDO POR ERROR
+  7 cambio(s) aplicado(s) antes del error.
+============================================================
